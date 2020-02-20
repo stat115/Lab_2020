@@ -1,0 +1,318 @@
+---
+title: "Lab 2"
+subtitle: "Introductory Computing -2"
+author: "Qing Zhang"
+date: "Updated: `r Sys.Date()`"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+
+
+---
+
+
+# This week:
+## Introductory Computing 2
+
+- Odyssey Intro
+- Odyssey Demo
+  - Login
+  - File transfer
+  - Navigation, HW7
+  - For-loop
+  - sbatch script
+- BWA and STAR
+- HW7 potential gene
+- Dynamic programming
+
+
+---
+# Odyssey
+
+- What is Odyssey? Lots of computers stringed together
+- Advantage: More storage, can run many things in parallel (e.g. use 10 computers to process 10 samples at a time)
+- Disadvantage: a lot of overhead to get things to work (have to make sure your stuff doesn't interfere with other people's stuff)
+- Can't just run stuff through the terminal on Odyssey, you will need to submit job using srun or sbatch (preferred)
+- My tip: start off by requesting very few resources and doing a test run on a small file.
+- **START EARLY**. You might have to wait a long time for your jobs to run.
+- Odyssey might also be slow if everyone in the class tries at
+the last minute.
+
+---
+## Odyssey Logistics
+
+- Login using ssh (Mac/Linux) or PuTTY (Windows)
+- Need both your password and 6-digit code, either on your phone or
+as a Java applet on your computer.
+- Transfer files using Filezilla or WinSCP.
+- Details: [https://www.rc.fas.harvard.edu/resources/odyssey-quickstart-guide/](https://www.rc.fas.harvard.edu/resources/odyssey-quickstart-guide/)
+
+
+---
+
+## Basic Bash Commands
+
+- `pwd`: Print Working Directory. Where am I?
+- `cd folder`: Change directories.
+- `cd`: Shortcut to go back to home directory.
+- `..`: Shortcut for going up a directory.
+    - `cd ..`
+    - `cd ../../`
+    - `cd ../folder`
+- `~`: shortcut for home directory. Can use it like so: `cd ~/stat115-hw2`.
+- `mkdir folder`: Make a directory called `folder`.
+- `less file`: View a file. Press `q` to quit.
+- `man cmd`: Get help on `cmd`. Press `q` to quit.
+- Videos about command line: [https://www.youtube.com/watch?v=U3iNcBtycaQ](https://www.youtube.com/watch?v=U3iNcBtycaQ)
+
+---
+
+# Odyssey Commands
+
+Odyssey uses **slurm** workload manager.
+
+- Submit a batch serial job: 	`sbatch runscript.sh`
+- Run a script or application interactively: `srun --pty -p test -t 10 --mem 1000 /bin/bash [script or app]`
+- Start interactive session: `srun --pty -p test -t 10 --mem 1000 /bin/bash`
+- Kill a job: `scancel 999999`
+- View status of your jobs :`squeue -u username`
+- Check current job by id number: `sacct -j 999999`
+
+
+- Can check job status online, too: [https://portal.rc.fas.harvard.edu/login/?next=/jobs/](https://portal.rc.fas.harvard.edu/login/?next=/jobs/)
+
+
+
+---
+
+## Example Submission Script
+
+- Save this to a file in your home directory (e.g. `submit.sh`).
+    + Good idea to make a `stat115-hw2` folder
+- Submit by running `sbatch submit.sh`.
+- Can edit on your own computer using a a plain text editor (e.g.
+Sublime or TextEdit)
+- Transfer the file using Filezilla/WinSCP.
+
+```{r engine = "bash", eval = FALSE}
+#!/bin/bash
+#SBATCH -n 1 # Number of cores requested
+#SBATCH -N 1 # Ensure that all cores are on one machine
+#SBATCH -t 15 # Runtime in minutes
+#SBATCH -p serial_requeue # Partition to submit to
+#SBATCH --mem=1G # Memory in GB (see also --mem-per-cpu)
+#SBATCH -o output_%j.out # Standard out goes to this file
+#SBATCH -e error_%j.err # Standard err goes to this file
+
+# LOAD_MODULES
+module load bwa/0.7.15-fasrc02
+
+
+# YOUR_COMMANDS_HERE
+echo JOB_FINISHED
+```
+
+
+---
+
+## Submission Script Recommendations
+
+- Runtime: 30 min for BWA, 20 min for STAR
+- Memory: 5G for BWA, 32G for STAR
+- Change the name of the `.out` and `.err` files to something more
+meaningful.
+- Permission: You cannot write to class folder - please read files from class folder and save output to your somewhere under your home directory.
+- Stick with `serial_requeue`. You'll have to wait less.
+- Need to load modules for the tools we want to use.
+- Modules for BWA:
+``` 
+module load bwa/0.7.15-fasrc02
+module load samtools/1.5-fasrc02
+```
+- Modules for STAR:
+```
+module load STAR/2.6.0c-fasrc01
+```
+- Module search: [https://portal.rc.fas.harvard.edu/p3/build-reports/](https://portal.rc.fas.harvard.edu/p3/build-reports/)
+
+
+---
+
+# Odyssey Demo
+
+
+---
+
+# BWA
+
+- Uses Burrows-Wheeler transform.
+- Requires an index to be made before aligning.
+- 3 different versions:
+    + BWA-backtrack (`aln/samse/sampe`)
+    + BWA-SW (`bwasw`)
+    + BWA-MEM (`mem`)
+- Different recommendations depending on data:
+    + BWA-backtrack: Illumina reads up to 100bp
+    + BWA-SW / BWA-MEM: longer sequeces from 70bp to 1Mbp
+    + BWA-MEM latest version, recommended since generally faster and
+    more accurate
+    + BWA-MEM better than BWA-backtrack for 70-100bp Illumina reads
+- We have short reads, so for the HW, we recommend `bwa aln`.
+
+
+
+---
+- How to run (basic):
+    - Replace `ref.fasta` and `read1.fastq` with the path on Odyssey.
+
+```{r engine = "bash", eval = FALSE}
+# align each end separately
+bwa aln ref.fasta read1.fastq > read1.sai
+bwa aln ref.fasta read2.fastq > read2.sai
+
+# stick everything in a SAM file
+bwa sampe ref.fasta read1.sai read2.sai read1.fastq read2.fastq > aln-pe.sam
+
+# count number of aligned reads, etc.
+samtools flagstat aln-pe.sam
+
+# count number of uniquely mapped reads
+samtools view -h aln_pe.sam | grep -v -e 'XA:Z:'  -e 'SA:Z:'| samtools view -F 0x900 -f 0x2 -q 5| wc -l
+```
+
+
+---
+# STAR
+
+- [Star: ultrafast universal RNA-seq aligner](https://academic.oup.com/bioinformatics/article/29/1/15/272537)
+    - Suffix array (SA) approach to leverage speed of binary searching.
+    - Requires an index (the SA) to be created prior to aligning.
+- Splice-aware aligner.
+- Replace STARIndex with path of STARIndex.
+- Replace `read1.fastq` and `read2.fastq` with path to the reads.
+- Replace `output` with something more meaningful.
+
+```{r, engine = "bash", eval = FALSE}
+STAR --genomeDir STARIndex \
+--readFilesIn read1.fastq read2.fastq \
+--runThreadN 1 --outFileNamePrefix output 
+```
+
+---
+# HW1- Question 7
+
+a. How many lines are there in this file? How many times "KRAS" gene 
+has appeared?
+
+```
+command to subset | count the lines
+```
+
+- `grep`
+- `wc`
+
+---
+
+b. How many unique `Variant_Classification` are there in the MAF? Please 
+count occurence of each type and sort them. Which one is the most frequent? 
+
+c. What are the top FIVE most frequent genes? Please provide 
+the bash command and equivalent Python command. If you are a PI 
+looking for a gene to investigate (you need to find a gene with potentially 
+better biological significance), which gene out of the top 5 would you 
+choose? Why?
+
+**Similar question: how to get value_counts for a column?**
+
+```
+ cut -f${column_num} ${tab_path} | sort | uniq -c | sort -n
+```
+
+---
+
+## Equivalent Python Command
+
+- Read file and save the colunm as a list
+
+```
+with open('/n/stat115/2020/HW1/public_MC3.maf') as f:
+    lines = [line.rstrip().split('\t')[2] for line in f]
+```
+
+- Count values from a list
+
+```
+from collections import Counter
+cc = Counter(lines)
+```
+
+- Find the top N frequent genes (get the indices)
+
+```
+sorted(range(len(cc.values())), key=lambda i: cc.values()[i])[-N:]
+```
+
+---
+
+# How to choose a gene of biological significance?
+
+- Cancer is "uncontrolled cell division"" and is caused by mutation. 
+- We are interested in genes with *recurrent* mutations that occurs on many patients over different cancer types.
+  - However, mutations are usually malignant (due to evolution)
+  - The ones that are persisent usually give cells some advantage (e.g. to proliferate more, escape proofread mechanism in replication).
+
+----
+We can repharse the question as:
+> Which gene is significantly more likely to mutate than by chance?
+
+- Literature is great!
+- Null hypothesis?
+  - Assume each base is equally mutable:
+    - What will happen to long gene?
+    - What if slience mutation dominates?
+    - Let checking mutation landscape using [Tumor Portal](http://www.tumorportal.org/)
+
+
+---
+
+# Dynamic programming
+
+- Find the maximum subset sum. Print out both the sum and the starting
+and ending index.
+- Must use dynamic programming: only loop through the array once.
+- Dynamic programming: solve overlapping sub-problems.
+- Notation: array $A$ with $k$ elements $\{A_0, A_1, \ldots, A_{k - 1}\}$.
+- If we know the maximum subset sum up to position i is $B_i$, what is
+the maximum sum up to position $i + 1$?
+    - $B_{i + 1} = \max(B_i + A_{i + 1}, A_{i+1})$.
+    - Can loop through the array and iterate over $i$.
+    - Keep track of the maximum of the $B_i$.
+    - Maximum subset sum is $\max_{i} B_i$.
+
+---
+
+### Problem 9: Indexes, runtime, and memory.
+
+- End index of maximum subset sum is the maximizing $i$.
+- Start index:
+    - Start index for a sequence changes when we pick $A_{i + 1}$
+    instead of $A_{i + 1} + B_{i}$.
+    - Keep track of the current start index.
+    - When the maximum $B_i$ changes, update the start index of the
+    maximum subset sum.
+- Only need to loop through the array once. Only 1 `for` loop.
+- Memory: Don't need to store all the $B_i$, just the previous one.
+- $O(1)$ space and $O(n)$ runtime.
+
+
+---
+
+# Finally...
+
+- Please do not make your homework public on Github.
+- Office Hour: Friday 4:30-5:30 PM HSPH Kresge Cafe
+
