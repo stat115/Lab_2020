@@ -1,0 +1,164 @@
+---
+title: "Stat 115 Lab 6"
+subtitle: "HW3 troubleshooting"
+author: "Qing Zhang"
+date: "March 3/5, 2020"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE, fig.align = "center")
+```
+
+## Anouncements
+
+- Additional office hour
+  - March 6th Friday 1-3pm Kresge Cafe
+  - March 8th Sunday 11:00-noon Science Center Clover
+
+---
+
+
+## Homework: Question-1
+
+## Part I: Sample classification
+
+We provide you z-score normalized expression data of 50 breast tumor samples, 50 normal breast samples (your training and cross-validation data), and 20 samples without diagnosis (your testing data). We want to use the 100 samples with known diagnosis to train machine learning models in order to predict the 20 unknown samples. 
+
+You will need the following libraries in R: `ggplot2` and `ggfortify` for plotting, `MASS` and `caret` for machine learning, and `pROC` is for evaluating testing performance. The [YouTube video on caret](https://youtu.be/z8PRU46I3NY) and the [package documentation](http://topepo.github.io/caret/index.html) might be helpful.
+
+```{r prepare}
+library(ggplot2)
+library(ggfortify)
+library(pROC)
+library(caret)
+library(e1071) # KNN
+library(kernlab) #SVM
+
+#### read in data for question 1
+dataset <- read.table(file = "q1_data/BRCA_zscore_data.txt", sep = "\t", header = TRUE, row.names = 1)
+phenotype <- read.table(file = "q1_data/BRCA_phenotype.txt",sep = "\t", header = TRUE, row.names = 1)
+phenotype <- as.character(phenotype[rownames(dataset),'phenotype'])
+```
+
+---
+
+
+### 1. Run PCA for dimension reduction on the 100 samples with known labels, and draw these 100 samples in a 2D plot. Do cancer and normal separate from the first two PCs? Would this be sufficient to classify the unknown samples?
+
+
+```{r}
+# phenotype column should not be included!
+pca.mat <- cbind.data.frame(dataset,label = phenotype)
+pca.res <- prcomp(dataset)
+##view the first two PCs by ggfortify::autoplot()
+autoplot(pca.res,data = pca.mat, col='label',size=1,frame = TRUE, frame.type = 'norm')+
+  scale_color_manual(values =c("#377EB8","#E41A1C"))+
+  theme_bw()+
+  labs(x = "PC1", y = "PC2")
+```
+
+
+### 2. Draw a plot showing the cumulative % variance captured from the top 100 PCs. How many PCs are needed to capture 90% of the variance? 
+
+
+```{r}
+# your code here
+pc.var <- cumsum(pca.res$sdev^2/sum(pca.res$sdev^2))
+```
+
+---
+
+### 3. Apply machine learning methods (KNN, logistic regression, Ridge regression, LASSO, ElasticNet, random forest, and support vector machines) on the top 25 PCs of the training data and 5-fold cross validation to classify the samples. `caret` and `MASS` already implemented all of the machine learning methods, including cross-validation. In order to get consistent results from different runs, use `set.seed(115)` right before each `train` command. 
+
+```{r}
+input.reduction <- data.frame(pca.res$x[,1:25])
+input.reduction$phenotype <- as.factor(phenotype)
+rownames(input.reduction) <- rownames(pca.res$x)
+
+# is "phenotype" a column from your dataframe?
+fit.enet <- train(phenotype~., data=input.reduction, method="glmnet", metric=metric, trControl=control,
+                   tuneGrid=expand.grid(alpha =0.5,lambda=seq(0.1,5,0.1))
+                   )
+```
+
+- Parameter(optimize by model training) 
+- Hyper-parameter(need to pick in advance, chosen by Grid search or by experience)
+
+---
+
+### 4. Summarize the performance of each machine learning method, in terms of accuracy and kappa. 
+
+```{r}
+# your code here
+results <- resamples(list(KNN=fit.knn, 
+                          ElesticNet=fit.enet))
+summary(results)
+dotplot(results)
+```
+
+---
+
+### 5. For Graduate students: Compare the performance difference between logistic regression, Ridge, LASSO, and ElasticNet. In LASSO, how many PCs have non-zero coefficient? In ElasticNet, what is the lamda for Ridge and LASSO, respectively? 
+
+```{r}
+# your code here
+lasso_coef <- as.matrix(coef(fit.lasso$finalModel, fit.lasso$bestTune$lambda))
+lasso_nonZero <- length(lasso_coef[lasso_coef != 0,])
+```
+
+- Why LASSO allows a coefficient to be zero?
+- Elastic Net is the unifying framework that contains Lasso and Ridge
+
+---
+
+### 6. Use the PCA projections in Q1 to obtain the first 25 PCs of the 20 unknown samples. Use one method that performs well in Q4 to make predictions. Caret already used the hyper-parameters learned from cross-validation to train the parameters of each method on the full 100 training data. You just need to call this method to make the predictions. 
+
+```{r}
+# first project testing data to previous PCA axis
+testing_reduction <- predict(pca.res, newdata = testing_data)[,c(1:25)]
+predictions <- predict(fit.svm, testing_reduction) 
+```
+
+---
+
+### 7. For Graduate students: Can you find out the top 3 genes that are most important in this prediction method in Q6? Do they have some known cancer relevance? 
+
+```{r}
+genes_imp <- pcs_imp <- varImp(fit.svm)
+genes_imp$importance <-  as.data.frame(as.matrix(pca.res$rotation[,c(1:25)]) %*% as.matrix(pcs_imp$importance))
+```
+
+Cancer relevance: gene ontology, Tumor Portal, Pubmed
+
+---
+
+### 8. Suppose a pathologist later made diagnosis on the 20 unknown samples (load the diagnosis.txt file). Based on this gold standard, draw an ROC curve of your predictions in Q6. What is the prediction AUC? 
+
+```{r}
+# your code here
+```
+
+You need to call `roc` function with input for true label, and numerical prediction from `predict` function (set `type = "prob"`).
+
+---
+
+## Part II. Single cell RNA-seq 
+
+For this exercise, we will be analyzing a single cell RNA-Seq dataset of human peripheral blood mononuclear cells (PBMC) from 10X Genomics (droplet-based) from a healthy donor (Next GEM). The raw data can be found below which is already processed by CellRanger into the expression matrix format. 
+
+https://support.10xgenomics.com/single-cell-gene-expression/datasets/3.0.2/5k_pbmc_v3_nextgem
+
+- Please download the filtered matrix instead of raw.
+- **[correction]** If you think that cell cycle plays a role, you should use PCs after correction (your choice)
+- **[correction]** `FindVariableGenes()` should be `FindVariableFeatures()`
+- It is okay if you cannot annotate every cluster - just do your best!
+
+---
+
+## Thanks!
+
+- See you at cancer genomics guest lecture![w/ Professor Gad Getz]
+- Additional office hour
+  - March 6th Friday 1-3pm Kresge Cafe
+  - March 8th Sunday 11:00-noon Science Center Clover
