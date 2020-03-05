@@ -61,10 +61,13 @@ Qing Zhang
 <div id="anouncements" class="slide section level2">
 <h2>Anouncements</h2>
 <ul>
-<li>Additional office hour</li>
+<li>Additional office hour
+<ul>
 <li>March 6th Friday 1-3pm Kresge Cafe</li>
 <li>March 8th Sunday 11:00-noon Science Center Clover</li>
+</ul></li>
 </ul>
+<p>Please feel free to send me email / post questions on Slack instead of comming to those office hour, if you are worried about coronavirus! (Please be careful!!)</p>
 </div>
 <div id="homework-question-1" class="slide section level2">
 <h2>Homework: Question-1</h2>
@@ -113,7 +116,8 @@ fit.enet &lt;-<span class="st"> </span><span class="kw">train</span>(phenotype<s
                    )</code></pre></div>
 <ul>
 <li>Parameter(optimize by model training)</li>
-<li>Hyper-parameter(need to pick in advance, chosen by Grid search or by experience)</li>
+<li><p>Hyper-parameter(need to pick in advance, chosen by Grid search or by experience)</p></li>
+<li><p>Why my logistic regression <code>glm</code> does not converge? It happens when you achieve 100% separation in differentiating the labels. Solution: you will need user penalized regression (<code>glmnet</code>) or SVM (which handles clean separation). For your homework where the purpose is to do prediction rather than inference, just leave it there!</p></li>
 </ul>
 </div>
 <div class="slide section level2">
@@ -164,7 +168,8 @@ genes_imp<span class="op">$</span>importance &lt;-<span class="st">  </span><spa
 <li>Please download the filtered matrix instead of raw.</li>
 <li><strong>[correction]</strong> If you think that cell cycle plays a role, you should use PCs after correction (your choice)</li>
 <li><strong>[correction]</strong> <code>FindVariableGenes()</code> should be <code>FindVariableFeatures()</code></li>
-<li>It is okay if you cannot annotate every cluster - just do your best!</li>
+<li><p>It is okay if you cannot annotate every cluster - just do your best!</p></li>
+<li><p><code>DimPlot()</code> for PCA.</p></li>
 </ul>
 </div>
 <div id="thanks" class="slide section level2">

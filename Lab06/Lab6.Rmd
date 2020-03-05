@@ -13,8 +13,11 @@ knitr::opts_chunk$set(echo = TRUE, eval = FALSE, fig.align = "center")
 ## Anouncements
 
 - Additional office hour
-  - March 6th Friday 1-3pm Kresge Cafe
-  - March 8th Sunday 11:00-noon Science Center Clover
+    - March 6th Friday 1-3pm Kresge Cafe
+    - March 8th Sunday 11:00-noon Science Center Clover
+
+Please feel free to send me email / post questions on Slack instead of comming to those office hour, if you are worried about coronavirus! (Please be careful!!)
+
 
 ---
 
@@ -85,6 +88,8 @@ fit.enet <- train(phenotype~., data=input.reduction, method="glmnet", metric=met
 - Parameter(optimize by model training) 
 - Hyper-parameter(need to pick in advance, chosen by Grid search or by experience)
 
+- Why my logistic regression `glm` does not converge? It happens when you achieve 100% separation in differentiating the labels. Solution: you will need user penalized regression (`glmnet`) or SVM (which handles clean separation). For your homework where the purpose is to do prediction rather than inference, just leave it there!
+
 ---
 
 ### 4. Summarize the performance of each machine learning method, in terms of accuracy and kappa. 
@@ -153,6 +158,11 @@ https://support.10xgenomics.com/single-cell-gene-expression/datasets/3.0.2/5k_pb
 - **[correction]** If you think that cell cycle plays a role, you should use PCs after correction (your choice)
 - **[correction]** `FindVariableGenes()` should be `FindVariableFeatures()`
 - It is okay if you cannot annotate every cluster - just do your best!
+
+- `DimPlot()` for PCA.
+
+
+
 
 ---
 
