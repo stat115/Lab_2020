@@ -1,0 +1,196 @@
+---
+title: "Stat 115 Lab 8"
+subtitle: "Homework4 Clarifications"
+author: "Qian Xiao"
+date: "March 23, 2020"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center")
+```
+
+
+## Anouncements
+
+- Lab is pre-recorded and the link will be posted on Canvas
+- HW4 is due on March 29, 2020 @ 11:59 pm
+- OHs during regular lab session times, additional OHs on Friday
+
+
+## Outline
+
+- HW4 Clarifications
+
+
+## Homework questions overview
+
+## 12:
+
+Now we try to see what target genes these AR binding sites regulate. Among the differentially expressed genes in prostate cancer, only a subset might be directly regulated by AR binding. One simple way of getting the AR target genes is to look at which genes have AR binding in its promoters. Write a python program that takes two input files: 1) the AR differential ChIP-seq peaks in tumor over normal; 2) refGene annotation. The program outputs to a file containing genes that have AR ChIP-seq peak (in this case, stronger peak in tumor) within 3KB + / - from the transcription start site (TSS) of the gene. How many putative AR target genes in prostate cancer do you get using this approach? 
+
+Note: From UCSC (http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/), download the human RefSeq annotation table (find the file refGene.txt.gz for Hg38). To understand the columns in this file, check the query annotation at http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/refGene.sql. 
+
+Hint: TSS is different for genes on positive or negative strand, i.e. TSS is “txStart” for genes on the positive strand, “txEnd” for genes in negative strand. When testing your python code, try smaller number of gene annotations or smaller number of peaks to check your results before moving forward. 
+
+
+```{python, python.reticulate = FALSE, eval=FALSE}
+
+import pandas as pd
+
+#Read in the reference data
+TSS = pd.read_table('/Users/qianxiao/Desktop/stat115_2020/lab7/refGene.txt', header=None)
+
+#Create a subset from it with the columns we need 
+TSS_sub = TSS.iloc[:,[2,4,5,3,1]]
+TSS_sub.columns = ["chr","start","end","strand","id"]
+
+#Create subsets of genes on positive strand and negative strand
+TSS_pos = TSS_sub[TSS_sub.strand == '+']
+TSS_neg = TSS_sub[TSS_sub.strand == '-']
+
+#Rearrange the data and create a new dataframe containing the information of TSS we want
+TSS_pos.end = TSS_pos.start
+TSS_neg.start = TSS_neg.end
+TSS_new = TSS_pos.append(TSS_neg)
+TSS_new.end = TSS_new.end + 1
+
+#Export it into a bed file
+TSS.to_csv("/Users/qianxiao/Desktop/stat115_2020/lab7/TSS_HG38.bed",sep='\t',header=False)
+```
+
+
+```{r, engine='bash', eval=FALSE}
+module load centos6/0.0.1-fasrc01
+module load bedtools/2.17.0-fasrc01
+
+#We can use bedtools to select a window size of 3000, then find the overlaps between the peaks and the annotated genes
+bedtools window -w 3000 -u -a TSS_HG38.bed -b q4_diff_peaks_summits.bed > putative_AR_target_genes.bed
+
+#Count the number of genes
+wc -l putative_AR_target_genes.bed
+
+
+#The same task might be also completed with the python package wrapping BEDTools (pybedtools), but you would need to install and import it 
+```
+
+## 13. 
+
+Now overlap the putative AR target genes you get from above with up regulated genes in prostate cancer(up_regulated_genes_in_prostate_cancer.txt). Try to run DAVID on 1) the AR target genes from binding alone and 2) the AR target genes by overlapping AR binding with differential expression. Are there enriched GO terms or pathways? 
+
+```{r}
+#Read in the upregulated genes and the putative target genes
+
+#Find the overlap between them 
+
+#Generate lists of genes and run DAVID(use refseq ID and choose refseq_mrna option on DAVID)
+```
+
+## 14. 
+
+Another way of getting the AR target genes is to consider the number of AR binding sites within 100KB of TSS, but weight each binding site by an exponential decay of its distance to the gene TSS (i.e. peaks closer to TSS have higher weights). For this, we have calculated regulatory potential score for each refseq gene(AR_peaks_regulatory_potential.txt). Select the top 1500 genes with highest regulatory potential score, try to run DAVID both with and without differentially expression, and see the enriched GO terms. 
+
+Note: Basically this regulatory potential approach assumes that there are stronger AR targets (e.g. those genes with many AR binding sites within 100KB and have stronger differential expression) and weaker AR targets, instead of a binary Yes / No AR targets.
+
+```{r}
+#Read in the peaks with different regulatory potential score
+
+#Rank them by the score and select the top 1500 genes (based on Refseq ID)
+
+#Find the overlap between the top 1500 genes and the upregulated genes you imported in Q13
+
+#Generate lists of genes and run DAVID(use refseq ID and choose refseq_mrna option on DAVID)
+```
+
+## 15. 
+
+Comment on the AR targets you get from promoter binding (your code) and distance weighted binding. Which one gives you better function / pathway enrichment? Does considering differential expression help?
+
+## PART VI. ATAC-seq
+
+The molecular mechanism of a type of T cell leukemia is poorly understood. Since it is unclear which transcription factors (TF) are involved, scientists can’t do TF ChIP-seq. Instead, ATAC-seq was performed on the T cells from both the normal donors and the T cell leukemia patients on many individuals. For this HW, we will only select 3 normal (norm1, norm2, norm3) and 3 leukemia (leuk1, leuk2, leuk3) samples, and give you the read mapping BAM files (to Hg38). This part of the HW will show you how epigenetic profiling can help identify key transcription factors and the regulatory mechanisms of biological processes and diseases. 
+
+Unlike ChIP-seq which often uses chromatin input as controls, ATAC-seq has no control samples. The best way to call differential ATAC-seq peaks between the tumor and normal is to obtain the union of tumor and normal ATAC-seq peaks, extract the read counts from all the 6 samples in the union peaks, then run DESeq2 on them to find differential peaks. SAMTools (http://samtools.sourceforge.net/) and BEDTools (https://bedtools.readthedocs.io/en/latest/) are extremely useful tools to manipulate SAM/BAM and BED files. Let’s try them here.
+
+## 16. 
+
+One way of getting the union peak is to run MACS on each of the samples separately, then use BEDTools to merge the peaks together. E.g. if we use MACS to run peak calling on norm1 (norm1.bed) and leuk1 (leuk1.bed), can you merge the two sets of peaks into one merge.bed file using BEDTools? How many peaks can you return? (Hint: MACS2 FDR cutoff 0.01 on each sample first).
+
+Hint: 
+All the bam files are stored under /n/stat115/2020/HW4/Part_VI.
+Please refer to https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE85853 to verify whether the bam files contain data collected from a normal donor or a leukemic donor.
+
+```{r, engine='bash', eval=FALSE}
+#Just as Part I
+
+#Load the modules
+
+#Remove duplicates for each sample
+
+#Call peak for each sample
+```
+
+```{r, engine='bash', eval=FALSE}
+#Then you can merge the output bed files using Bedtools
+#Some sample commands
+module load bedtools2/2.26.0-fasrc01
+
+cat sample1_summits.bed sample2_summits.bed | sortBed -i | mergeBed > merged.bed
+
+```
+
+## 17. 
+
+Another way of calling the union peaks is to concatenate all the 6 BAM files together, then run MACS. We have done this already (union.bed). Use BEDTools to calculate the Jaccard index between the union.bed and merge.bed you got in Q1. Jaccard index between set A and set B is defined as (A $\cap$ B)/(A $\cup$ B). 
+
+```{r, engine='bash', eval=FALSE}
+# your bash code here
+
+#Find the function to use for Jaccard index calculation
+
+```
+
+## 18. 
+
+Extract the reads from the six BAM files in the union.bed peaks. Either the BEDTools multicov function or SAMTools bedcov function can achieve this, and generate a read count matrix on the peaks in the six files. Draw a PCA plot of the resulting matrix.
+
+```{r, engine='bash', eval=FALSE}
+# your bash code here
+
+#Need to index the bam files before using multicov
+#Some sample commands
+module load samtools/1.5-fasrc02
+module load centos6/0.0.1-fasrc01
+module load bedtools/2.17.0-fasrc01
+
+samtools index sample1.sorted.bam
+samtools index sample2.sorted.bam
+
+bedtools multicov -bams sample1.sorted.bam sample2.sorted.bam -bed union.bed > matrix.bed
+```
+
+## 19. 
+
+Run DESeq2 on the six samples to identify differential ATAC-seq peaks between the 3 leukemia and 3 normal samples. How many peaks are leukemia specific or normal specific at FDR < 0.05? 
+
+```{r}
+#The upregulated peaks in leukemia are considered leukemia specific
+
+#The downregulated peaks in leukemia (i.e.upregulated peaks in normal) are considered normal specific
+```
+
+## 20. 
+
+Take the leukemia-specific ATAC-seq peaks, and run them on Cistrome Toolkit to see what public ChIP-seq have significant overlap with them. What transcription factors might be important in regulating this type of leukemic T cells?
+
+
+## 21. 
+
+In Q10, we mentioned that sometimes members of the same transcription factor family have similar binding motifs, similar binding sites (when they are expressed, although they might be expressed in very different tissues), and related functions. Supposedly we don’t have RNA-seq of these samples to calculate the expression level of the TF. However, we can use regulatory potential to assign the ATAC-seq peaks to genes to infer the expression level of a gene (i.e. a gene with many ATAC-seq peaks near its TSS is often expressed at higher level), and see whether the inferred TF might have higher expression in leukemia than normal. Could you describe (not necessarily do it) how to refine the hypothesis on the specific TFs that might regulate this type of leukemic T cells? 
+
+
+
+
+## Thank you!
+
+
